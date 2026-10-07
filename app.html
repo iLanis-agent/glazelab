@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GlazeLab: unity formula calculator</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#f3f1ee;color:#2e2a26;min-height:100vh;padding:24px 14px;display:flex;justify-content:center}
+main{width:100%;max-width:560px}
+h1{font-size:22px;margin-bottom:2px}
+.sub{color:#8a8178;font-size:13px;margin-bottom:18px}
+.card{background:#fff;border-radius:14px;box-shadow:0 6px 24px rgba(60,50,40,.08);padding:20px;margin-bottom:16px}
+label{font-size:12px;font-weight:600;color:#8a8178;display:block;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.04em}
+input,select{padding:10px 12px;border:1.5px solid #ddd5cc;border-radius:9px;font-size:15px;font-family:inherit;background:#fff}
+input:focus,select:focus{outline:none;border-color:#7c6a9c}
+.result{margin-top:14px;padding:14px;border-radius:10px;background:#efeaf5;display:none}
+.result.show{display:block}
+.big{font-size:18px;font-weight:700;color:#5c4884}
+.kv{font-size:13px;color:#5e564d;margin-top:4px;line-height:1.5}
+.row{display:flex;gap:8px;margin-top:8px;align-items:center}
+.row select{flex:1}.row input{width:80px}
+.addbtn{margin-top:10px;padding:8px 14px;border-radius:9px;border:1.5px solid #7c6a9c;background:#fff;color:#5c4884;font-size:13px;cursor:pointer}
+.x{border:none;background:none;color:#a04a3a;font-size:16px;cursor:pointer;padding:4px}
+a{color:#5c4884;text-decoration:none}
+footer{font-size:12px;color:#9a9188;text-align:center;margin-top:6px}
+table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}
+td,th{padding:5px 4px;text-align:left;border-bottom:1px solid #e5ded6}
+.note{font-size:12px;color:#9a5a2a;background:#faf0e6;border-radius:8px;padding:10px;margin-top:12px}
+</style>
+</head>
+<body>
+<main>
+<h1>GlazeLab</h1>
+<p class="sub">Unity molecular formula (Seger) calculator for glaze recipes</p>
+<div class="card">
+<label>Recipe (weight %)</label>
+<div id="rows"></div>
+<button class="addbtn" id="add">+ add material</button>
+<div class="result" id="umf"></div>
+<div class="note">Theoretical oxide compositions on a fired basis (LOI excluded). Real materials vary by source - test tiles before committing a kiln. Cone guidance is very approximate.</div>
+</div>
+<footer>Runs entirely in your browser. <a href="index.html">About</a></footer>
+</main>
+<script src="engine.js"></script>
+<script>
+var $=function(id){return document.getElementById(id)};
+var esc=function(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;};
+function addRow(mid,pct){
+  var div=document.createElement('div');div.className='row';
+  var sel=document.createElement('select');
+  GlazeLab.listMats().forEach(function(m){
+    var o=document.createElement('option');o.value=m.id;o.textContent=m.name;
+    sel.appendChild(o);
+  });
+  if(mid)sel.value=mid;
+  var inp=document.createElement('input');inp.value=pct||25;inp.setAttribute('inputmode','decimal');
+  var x=document.createElement('button');x.className='x';x.textContent='\u00d7';
+  x.onclick=function(){div.remove();calc();};
+  sel.onchange=calc;inp.oninput=calc;
+  div.appendChild(sel);div.appendChild(inp);div.appendChild(x);
+  $('rows').appendChild(div);
+}
+function calc(){
+  var rows=[];
+  $('rows').querySelectorAll('.row').forEach(function(r){
+    rows.push({id:r.querySelector('select').value,pct:parseFloat(r.querySelector('input').value)});
+  });
+  var r=GlazeLab.umf(rows);
+  var box=$('umf');
+  if(!r){box.classList.remove('show');return;}
+  box.classList.add('show');
+  if(!r.ok){box.innerHTML='<span class="kv">'+esc(r.error)+'</span>';return;}
+  var order=['K2O','Na2O','CaO','MgO','BaO','ZnO','Al2O3','B2O3','SiO2','TiO2','ZrO2'];
+  var h='<div class="big">SiO2:Al2O3 = '+(r.siAl===null?'n/a':r.siAl)+' &middot; '+esc(GlazeLab.coneGuess(r))+'</div>';
+  h+='<table><tr><th>Oxide</th><th>UMF (flux = 1)</th></tr>';
+  order.forEach(function(s){
+    if(r.umf[s]!==undefined&&r.umf[s]>0.0005){
+      h+='<tr><td>'+s+'</td><td>'+(Math.round(r.umf[s]*1000)/1000)+'</td></tr>';
+    }
+  });
+  h+='</table>';
+  var fb=r.fluxBreakdown,parts=[];
+  for(var s in fb)if(fb[s]>0.005)parts.push(s+' '+Math.round(fb[s]*100)+'%');
+  h+='<div class="kv">Flux split: '+parts.join(' &middot; ')+'</div>';
+  box.innerHTML=h;
+}
+$('add').onclick=function(){addRow();calc();};
+addRow('feldspar_potash',40);addRow('kaolin',20);addRow('silica',25);addRow('whiting',15);
+calc();
+</script>
+</body>
+</html>
